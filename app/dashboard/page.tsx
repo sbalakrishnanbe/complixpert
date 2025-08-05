@@ -17,12 +17,13 @@ import {
   Video,
   FileText,
   AlertTriangle,
-  Settings
+  Settings,
+  Youtube
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { VideoUpload } from '@/components/video-upload';
 import { AnalysisResults } from '@/components/analysis-results';
-import { analyzeContent, analyzeVideoContent, AnalysisResult } from '@/lib/ai';
+import { analyzeContent, analyzeVideoContent, analyzeYouTubeVideo, AnalysisResult } from '@/lib/ai';
 import { VideoProcessor, VideoMetadata, VideoAnalysisData } from '@/lib/video-analysis';
 import { authService } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -35,7 +36,7 @@ export default function DashboardPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analysisTimestamp, setAnalysisTimestamp] = useState<Date | null>(null);
-  const [analysisType, setAnalysisType] = useState<'text' | 'video'>('video');
+  const [analysisType, setAnalysisType] = useState<'text' | 'video' | 'youtube'>('video');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   
@@ -43,6 +44,9 @@ export default function DashboardPage() {
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
+  
+  // YouTube URL state
+  const [youtubeUrl, setYoutubeUrl] = useState('');
 
   const user = authService.getCurrentUser();
 
@@ -84,39 +88,110 @@ export default function DashboardPage() {
     setProcessingProgress(0);
     
     try {
-      // Step 1: Extract frames (20%)
-      setProcessingProgress(20);
-      toast.info('Extracting video frames...');
-      const frames = await VideoProcessor.extractFrames(selectedVideo, 5);
+      // Step 1: Enhanced video processing (30%)
+      setProcessingProgress(30);
+      toast.info('Processing video content with enhanced analysis...');
+      const videoAnalysisData = await VideoProcessor.processVideoForAnalysis(selectedVideo);
       
-      // Step 2: Extract audio data (40%)
-      setProcessingProgress(40);
-      toast.info('Processing audio content...');
-      const audioData = await VideoProcessor.extractAudio(selectedVideo);
+      // Step 2: YouTube requirements check (50%)
+      setProcessingProgress(50);
+      toast.info('Checking YouTube compliance requirements...');
+      const youtubeRequirements = VideoProcessor.checkYouTubeRequirements(videoAnalysisData.metadata);
+      const qualityRating = VideoProcessor.getVideoQualityRating(videoAnalysisData.metadata, videoAnalysisData.qualityMetrics);
       
-      // Step 3: Prepare analysis data (60%)
-      setProcessingProgress(60);
-      const videoAnalysisData: VideoAnalysisData = {
-        metadata: videoMetadata,
-        frames,
-        audioData
-      };
-      
-      // Step 4: AI Analysis (80%)
+      // Step 3: AI Analysis (80%)
       setProcessingProgress(80);
-      toast.info('Running AI analysis...');
-      const additionalContext = `Title: ${title}\nDescription: ${description}\nScript: ${script}`;
+      toast.info('Running advanced YouTube monetization policy analysis...');
+      const additionalContext = `
+        Title: ${title}
+        Description: ${description}
+        Script: ${script}
+        
+        Video Quality Analysis:
+        - Resolution: ${videoAnalysisData.metadata.width}x${videoAnalysisData.metadata.height}
+        - Quality Rating: ${qualityRating}
+        - Brightness: ${videoAnalysisData.qualityMetrics.averageBrightness}%
+        - Contrast: ${videoAnalysisData.qualityMetrics.contrast}%
+        - Sharpness: ${videoAnalysisData.qualityMetrics.sharpness}%
+        - Colorfulness: ${videoAnalysisData.qualityMetrics.colorfulness}%
+        
+        YouTube Requirements Check:
+        - Duration: ${youtubeRequirements.durationCheck ? 'PASS' : 'FAIL'}
+        - Resolution: ${youtubeRequirements.resolutionCheck ? 'PASS' : 'FAIL'}
+        - Aspect Ratio: ${youtubeRequirements.aspectRatioCheck ? 'PASS' : 'FAIL'}
+        - File Size: ${youtubeRequirements.sizeCheck ? 'PASS' : 'FAIL'}
+        - Format: ${youtubeRequirements.formatCheck ? 'PASS' : 'FAIL'}
+        
+        Frame Analysis: ${videoAnalysisData.frames.length} frames extracted at timestamps: ${videoAnalysisData.frameTimestamps.map(t => VideoProcessor.formatDuration(t)).join(', ')}
+        Thumbnails: ${videoAnalysisData.thumbnails.length} thumbnail candidates generated
+      `;
+      
       const result = await analyzeVideoContent(videoAnalysisData, platform, additionalContext, projectId!, location!);
       
-      // Step 5: Complete (100%)
+      // Step 4: Complete (100%)
       setProcessingProgress(100);
       setAnalysisResult(result);
       setAnalysisTimestamp(new Date());
-      toast.success('Video analysis completed successfully!');
+      
+      if (result.monetizationEligible) {
+        toast.success('✅ Video analysis completed! Content appears eligible for YouTube monetization.');
+      } else {
+        toast.warning('⚠️ Video analysis completed! Issues detected that may affect monetization.');
+      }
       
     } catch (error) {
       toast.error('Analysis failed. Please check your Google Cloud settings and try again.');
       console.error('Video analysis error:', error);
+    } finally {
+      setIsAnalyzing(false);
+      setProcessingProgress(0);
+    }
+  };
+
+  const handleAnalyzeYouTube = async () => {
+    if (!validateGoogleCloudSettings()) {
+      toast.error('Google Cloud Project ID and location are required. Please configure them in Settings.');
+      return;
+    }
+
+    if (!youtubeUrl.trim()) {
+      toast.error('Please enter a YouTube URL');
+      return;
+    }
+
+    if (!platform) {
+      toast.error('Please select a platform');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setProcessingProgress(0);
+    
+    try {
+      // Step 1: Validate YouTube URL (20%)
+      setProcessingProgress(20);
+      toast.info('Validating YouTube URL...');
+      
+      // Step 2: AI Analysis (80%)
+      setProcessingProgress(80);
+      toast.info('Analyzing YouTube video for monetization compliance...');
+      
+      const result = await analyzeYouTubeVideo(youtubeUrl, platform, projectId!, location!);
+      
+      // Step 3: Complete (100%)
+      setProcessingProgress(100);
+      setAnalysisResult(result);
+      setAnalysisTimestamp(new Date());
+      
+      if (result.monetizationEligible) {
+        toast.success('✅ YouTube video analysis completed! Content appears eligible for monetization.');
+      } else {
+        toast.warning('⚠️ YouTube video analysis completed! Issues detected that may affect monetization.');
+      }
+      
+    } catch (error) {
+      toast.error('Analysis failed. Please check your Google Cloud settings and try again.');
+      console.error('YouTube analysis error:', error);
     } finally {
       setIsAnalyzing(false);
       setProcessingProgress(0);
@@ -162,7 +237,7 @@ export default function DashboardPage() {
 Content Verifier AI - Analysis Report
 Generated: ${analysisTimestamp?.toLocaleString()}
 Platform: ${platform}
-Analysis Type: ${analysisType === 'video' ? 'Video File Analysis' : 'Text Content Analysis'}
+Analysis Type: ${analysisType === 'video' ? 'Video File Analysis' : analysisType === 'youtube' ? 'YouTube URL Analysis' : 'Text Content Analysis'}
 
 OVERALL ASSESSMENT
 Monetization Eligible: ${analysisResult.monetizationEligible ? 'YES' : 'NO'}
@@ -174,6 +249,11 @@ VIDEO INFORMATION
 Duration: ${VideoProcessor.formatDuration(videoMetadata.duration)}
 File Size: ${VideoProcessor.formatFileSize(videoMetadata.size)}
 Format: ${videoMetadata.type}
+` : ''}
+
+${youtubeUrl ? `
+YOUTUBE URL
+URL: ${youtubeUrl}
 ` : ''}
 
 CONTENT ANALYSIS
@@ -260,8 +340,8 @@ ${analysisResult.platformSpecific.requirements.map((req, index) => `• ${req}`)
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Analysis Type Tabs */}
-            <Tabs value={analysisType} onValueChange={(value) => setAnalysisType(value as 'text' | 'video')}>
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs value={analysisType} onValueChange={(value) => setAnalysisType(value as 'text' | 'video' | 'youtube')}>
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="video" className="flex items-center space-x-2">
                   <Video className="h-4 w-4" />
                   <span>Video File Analysis</span>
@@ -269,6 +349,10 @@ ${analysisResult.platformSpecific.requirements.map((req, index) => `• ${req}`)
                 <TabsTrigger value="text" className="flex items-center space-x-2">
                   <FileText className="h-4 w-4" />
                   <span>Text Content Analysis</span>
+                </TabsTrigger>
+                <TabsTrigger value="youtube" className="flex items-center space-x-2">
+                  <Youtube className="h-4 w-4" />
+                  <span>YouTube URL Analysis</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -411,6 +495,54 @@ ${analysisResult.platformSpecific.requirements.map((req, index) => `• ${req}`)
                     <>
                       <Play className="mr-2 h-5 w-5" />
                       Analyze Text Content
+                    </>
+                  )}
+                </Button>
+              </TabsContent>
+
+              <TabsContent value="youtube" className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="youtube-url">YouTube URL</Label>
+                  <Input
+                    id="youtube-url"
+                    placeholder="Enter a YouTube video URL"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="platform-youtube">Target Platform</Label>
+                  <Select value={platform} onValueChange={setPlatform}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Select platform" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="youtube">YouTube</SelectItem>
+                      <SelectItem value="tiktok">TikTok</SelectItem>
+                      <SelectItem value="instagram">Instagram Reels</SelectItem>
+                      <SelectItem value="facebook">Facebook</SelectItem>
+                      <SelectItem value="twitter">Twitter/X</SelectItem>
+                      <SelectItem value="generic">Generic/Multiple Platforms</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  onClick={handleAnalyzeYouTube} 
+                  disabled={isAnalyzing || !youtubeUrl.trim() || !validateGoogleCloudSettings()}
+                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Analyzing YouTube URL...
+                    </>
+                  ) : (
+                    <>
+                      <Youtube className="mr-2 h-5 w-5" />
+                      Analyze YouTube URL
                     </>
                   )}
                 </Button>

@@ -13,18 +13,49 @@ const AnalysisSchema = z.object({
         'monetization_policy',
         'visual_content',
         'audio_content',
+        'inauthentic_content',
+        'advertiser_friendly',
+        'community_guidelines',
+        'creator_responsibility',
+        'creator_integrity',
+        'youtube_specific'
       ]),
       severity: z.enum(['low', 'medium', 'high', 'critical']),
       description: z.string(),
       recommendation: z.string(),
       impact: z.string(),
       timestamp: z.number().optional(),
+      youtubeSpecific: z.object({
+        policyViolated: z.string().optional(),
+        complianceLevel: z.enum(['compliant', 'warning', 'violation', 'critical_violation']).optional(),
+        monetizationImpact: z.enum(['none', 'limited', 'demonetized', 'channel_strike']).optional(),
+      }).optional(),
     })
   ),
   recommendations: z.array(z.string()),
   platformSpecific: z.object({
     notes: z.array(z.string()),
     requirements: z.array(z.string()),
+    youtubeMonetization: z.object({
+      eligibilityStatus: z.enum(['eligible', 'limited', 'ineligible', 'under_review']),
+      partnerProgramRequirements: z.object({
+        subscribersCheck: z.boolean(),
+        watchHoursCheck: z.boolean(),
+        communityGuidelinesCheck: z.boolean(),
+        copyrightStrikesCheck: z.boolean(),
+      }),
+      adSuitability: z.object({
+        overallRating: z.enum(['suitable', 'limited', 'not_suitable']),
+        contentRating: z.string(),
+        advertiserFriendly: z.boolean(),
+      }),
+      contentAuthenticity: z.object({
+        originalContent: z.boolean(),
+        massProduced: z.boolean(),
+        repetitiveContent: z.boolean(),
+        templateBased: z.boolean(),
+      }),
+    }).optional(),
   }),
   contentAnalysis: z.object({
     visualElements: z.array(z.string()),
@@ -32,7 +63,27 @@ const AnalysisSchema = z.object({
     contentType: z.string(),
     appropriateAudience: z.string(),
     estimatedEngagement: z.string(),
+    youtubeOptimization: z.object({
+      thumbnailCompliance: z.boolean(),
+      titleOptimization: z.string(),
+      descriptionQuality: z.string(),
+      contentLength: z.string(),
+      engagementFactors: z.array(z.string()),
+    }).optional(),
   }),
+  youtubeCompliance: z.object({
+    advertiserFriendlyScore: z.number().min(0).max(100),
+    communityGuidelinesScore: z.number().min(0).max(100),
+    copyrightComplianceScore: z.number().min(0).max(100),
+    authenticityScore: z.number().min(0).max(100),
+    overallMonetizationScore: z.number().min(0).max(100),
+    policyBreakdown: z.array(z.object({
+      policy: z.string(),
+      status: z.enum(['pass', 'warning', 'fail']),
+      score: z.number().min(0).max(100),
+      details: z.string(),
+    })),
+  }).optional(),
 });
 
 export type AnalysisResult = z.infer<typeof AnalysisSchema>;
@@ -54,13 +105,6 @@ export async function analyzeVideoContent(
   location: string,
   additionalContext?: string
 ): Promise<AnalysisResult> {
-  // Convert audioData to base64 for transmission
-  const payload = { ...videoData };
-  if (payload.audioData) {
-    payload.audioDataBase64 = arrayBufferToBase64(payload.audioData);
-    delete payload.audioData;
-  }
-
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: {
@@ -69,9 +113,41 @@ export async function analyzeVideoContent(
     body: JSON.stringify({
       type: 'video',
       payload: {
-        videoData: payload,
+        videoData: {
+          ...videoData,
+          audioDataBase64: videoData.audioData ? arrayBufferToBase64(videoData.audioData) : undefined,
+        },
         platform,
         additionalContext,
+      },
+      projectId,
+      location,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Analysis failed');
+  }
+
+  return response.json();
+}
+
+export async function analyzeYouTubeVideo(
+  videoUrl: string,
+  platform: string,
+  projectId: string,
+  location: string
+): Promise<AnalysisResult> {
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'youtube',
+      payload: {
+        videoUrl,
+        platform,
       },
       projectId,
       location,

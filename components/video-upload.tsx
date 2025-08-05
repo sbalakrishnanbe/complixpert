@@ -95,7 +95,7 @@ export function VideoUpload({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'video/*': acceptedFormats.map(format => format.split('/')[1])
+      'video/*': acceptedFormats.map(format => '.' + format.split('/')[1])
     },
     multiple: false,
     disabled: isProcessing
