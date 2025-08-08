@@ -25,12 +25,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env
 .env*.local
-
-# Google Cloud credentials
-*.json
-google-cloud-key.json
+.env
 
 # vercel
 .vercel
@@ -38,3 +34,12 @@ google-cloud-key.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Google Cloud credentials
+google-cloud-credentials.json
+*.json.key
+*-service-account.json
+
+# IDE
+.vscode
+.idea
